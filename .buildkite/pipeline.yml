@@ -1,0 +1,52 @@
+steps:
+  - label: "build-gnu-x86-json"
+    commands:
+     - cargo build --release --features=json
+    retry:
+      automatic: false
+    agents:
+      platform: x86_64.metal
+      os: linux
+    plugins:
+      - docker#v3.8.0:
+          image: "rustvmm/dev:v12"
+          always-pull: true
+
+  - label: "build-musl-x86-json"
+    commands:
+     - cargo build --release --features=json --target x86_64-unknown-linux-musl
+    retry:
+      automatic: false
+    agents:
+      platform: x86_64.metal
+      os: linux
+    plugins:
+      - docker#v3.8.0:
+          image: "rustvmm/dev:v12"
+          always-pull: true
+
+  - label: "build-gnu-arm-json"
+    commands:
+     - cargo build --release --features=json
+    retry:
+      automatic: false
+    agents:
+      platform: arm.metal
+      os: linux
+    plugins:
+      - docker#v3.8.0:
+          image: "rustvmm/dev:v12"
+          always-pull: true
+
+  - label: "build-musl-arm-json"
+    commands:
+     - cargo build --release --features=json --target aarch64-unknown-linux-musl
+    retry:
+      automatic: false
+    agents:
+      platform: arm.metal
+      os: linux
+    plugins:
+      - docker#v3.8.0:
+          image: "rustvmm/dev:v12"
+          always-pull: true
