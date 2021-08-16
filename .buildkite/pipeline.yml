@@ -50,3 +50,16 @@ steps:
       - docker#v3.8.0:
           image: "rustvmm/dev:v12"
           always-pull: true
+
+  - label: "validate-syscall-tables"
+    commands:
+     - tools/generate_syscall_tables.sh --test
+    retry:
+      automatic: false
+    agents:
+      platform: x86_64.metal
+      os: linux
+    plugins:
+      - docker#v3.8.0:
+          image: "rustvmm/dev:v12"
+          always-pull: true

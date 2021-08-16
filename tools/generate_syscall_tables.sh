@@ -15,7 +15,7 @@ ROOT_DIR=$(cd "${TOOLS_DIR}/.." && pwd)
 KERNEL_DIR="${ROOT_DIR}/.kernel"
 
 generate_syscall_table_x86_64() {
-    path_to_rust_file="$ROOT_DIR/src/syscall_table/x86_64.rs"
+    path_to_rust_file=$3
 
     echo "$1" > $path_to_rust_file
 
@@ -30,7 +30,7 @@ generate_syscall_table_x86_64() {
 }
 
 generate_syscall_table_aarch64() {
-    path_to_rust_file="$ROOT_DIR/src/syscall_table/aarch64.rs"
+    path_to_rust_file=$3
 
     # filter for substituting `#define`s that point to other macros;
     # values taken from linux/include/uapi/asm-generic/unistd.h
@@ -78,6 +78,54 @@ validate_kernel_version() {
 
 }
 
+run_validation() {
+    # We want to re-generate the tables and compare them with the existing ones.
+    # This is to validate that the tables are actually correct and were not
+    # mistakenly or maliciously modified.
+    kernel_version_from_file=$(cat $path_to_x86_table | \
+        awk -F '// Kernel version:' '{print $2}' | xargs)
+
+    # Generate new tables to validate against.
+    generate_syscall_table_x86_64 \
+        "$header" "$footer" "$path_to_x86_test_table"
+    generate_syscall_table_aarch64 \
+        "$header" "$footer" "$path_to_aarch64_test_table"
+
+    # Remove the timestamp lines, which should be the only ones that differ.
+    sed -i '/^\/\/ Generated at:/d' $path_to_x86_test_table
+    sed -i '/^\/\/ Generated at:/d' $path_to_x86_table
+    sed -i '/^\/\/ Generated at:/d' $path_to_aarch64_test_table
+    sed -i '/^\/\/ Generated at:/d' $path_to_aarch64_table
+
+    # Perform comparison for x86_64. Tables should be identical.
+    cmp $path_to_x86_table $path_to_x86_test_table || {
+        echo ""
+        echo "x86_64 syscall table validation failed."
+        echo "Make sure they haven't been mistakenly altered."
+        echo ""
+
+        cleanup
+
+        exit 1
+    }
+
+    # Perform comparison for aarch64. Tables should be identical.
+    cmp $path_to_aarch64_table $path_to_aarch64_test_table || {
+        echo ""
+        echo "aarch64 syscall table validation failed."
+        echo "Make sure they haven't been mistakenly altered."
+        echo ""
+
+        cleanup
+
+        exit 1
+    }
+
+    cleanup
+
+    exit 0
+}
+
 # Exit with an error message
 die() {
     echo -e "$1" 
@@ -93,16 +141,28 @@ help() {
     echo ""
 }
 
+cleanup () {
+    rm -rf $KERNEL_DIR
+
+    if [[ $test_mode -eq 1 ]]; then
+        rm -rf $path_to_x86_test_table
+        rm -rf $path_to_aarch64_test_table
+    fi
+}
+
+test_mode=0
+
 # Parse command line args.
 while [ $# -gt 0 ]; do
     case "$1" in
         "-h"|"--help")      { cmd_help; exit 1;    } ;;
-        *)                  { kernel_version="$1"; break; } ;;
+        "--test")           { test_mode=1; break;  } ;;
+        *)                  { kernel_version="$1"; } ;;
     esac
     shift
 done
 
-validate_kernel_version "$kernel_version"
+((!test_mode)) && validate_kernel_version "$kernel_version"
 
 kernel_major=v$(echo ${kernel_version} | cut -d . -f 1).x
 kernel_baseurl=https://www.kernel.org/pub/linux/kernel/${kernel_major}
@@ -151,12 +211,22 @@ END
 # rust file footer
 footer="}"
 
-# generate syscall table for x86_64
-echo "Generating table for x86_64..."
-generate_syscall_table_x86_64 "$header" "$footer"
+path_to_x86_table="$ROOT_DIR/src/syscall_table/x86_64.rs"
+path_to_aarch64_table="$ROOT_DIR/src/syscall_table/aarch64.rs"
 
-# generate syscall table for aarch64
-echo "Generating table for aarch64..."
-generate_syscall_table_aarch64 "$header" "$footer"
+path_to_x86_test_table="$ROOT_DIR/src/syscall_table/test_x86_64.rs"
+path_to_aarch64_test_table="$ROOT_DIR/src/syscall_table/test_aarch64.rs"
 
-rm -rf "$KERNEL_DIR"
+if [[ $test_mode -eq 1 ]]; then
+    run_validation
+else
+    # generate syscall table for x86_64
+    echo "Generating table for x86_64..."
+    generate_syscall_table_x86_64 "$header" "$footer" "$path_to_x86_table"
+
+    # generate syscall table for aarch64
+    echo "Generating table for aarch64..."
+    generate_syscall_table_aarch64 "$header" "$footer" "$path_to_aarch64_table"
+
+    cleanup
+fi
