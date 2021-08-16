@@ -203,7 +203,7 @@ fn test_complex_filter() {
                                 "type": "qword",
                                 "op": "eq",
                                 "val": 4294967336,
-                                "comment": "std::u32::MAX as u64 + 41"
+                                "comment": "u32::MAX as u64 + 41"
                             }
                         ]
                     },
@@ -273,7 +273,7 @@ fn test_complex_filter() {
         validate_json_filter(
             json_input.as_bytes(),
             || unsafe {
-                libc::ioctl(0, 0, std::u32::MAX as u64 + 41);
+                libc::ioctl(0, 0, u32::MAX as u64 + 41);
             },
             Some(false),
         );
@@ -348,7 +348,7 @@ fn test_complex_filter() {
         validate_json_filter(
             json_input.as_bytes(),
             || unsafe {
-                libc::ioctl(0, 0, std::u32::MAX as u64 + 42);
+                libc::ioctl(0, 0, u32::MAX as u64 + 42);
             },
             Some(true),
         );
